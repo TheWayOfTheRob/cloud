@@ -18,9 +18,11 @@ import mock
 
 import tensorflow as tf
 import tensorflow_cloud as tfc
+from tensorflow_cloud.utils import google_api_client
 
 # The staging bucket to use for cloudbuild as well as save the model and data.
 _TEST_BUCKET = os.environ["TEST_BUCKET"]
+_PROJECT_ID = os.environ["PROJECT_ID"]
 
 
 class RunOnScriptTest(tf.test.TestCase):
@@ -32,16 +34,14 @@ class RunOnScriptTest(tf.test.TestCase):
             os.path.dirname(os.path.abspath(__file__)), "../testdata/"
         )
 
-        self._mock_sys = mock.patch(
-            "tensorflow_cloud.core.run.sys", autospec=True).start()
-
     def tearDown(self):
         mock.patch.stopall()
         super(RunOnScriptTest, self).tearDown()
 
     def _run_and_assert_success(self, *args, **kwargs):
-        tfc.run(*args, **kwargs)
-        self._mock_sys.exit.assert_called_once_with(0)
+        job_id = tfc.run(*args, **kwargs)
+        self.assertTrue(google_api_client.wait_for_api_training_job_success(
+            job_id, _PROJECT_ID))
 
     def test_auto_mirrored_strategy(self):
         self._run_and_assert_success(
