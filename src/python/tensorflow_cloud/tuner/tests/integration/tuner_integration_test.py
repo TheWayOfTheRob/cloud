@@ -24,6 +24,7 @@ import kerastuner
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow_cloud import CloudTuner
+from tensorflow_cloud.tuner import optimizer_client
 
 # If input dataset is created outside tuner.search(),
 # it requires eager execution even in TF 1.x.
@@ -123,6 +124,11 @@ def _dist_search_fn_wrapper(args):
 
 class _CloudTunerIntegrationTestBase(tf.test.TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        super(_CloudTunerIntegrationTestBase, cls).setUpClass()
+        cls._study_ids = []
+
     def _assert_output(self, fn, regex_str):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
@@ -138,6 +144,22 @@ class _CloudTunerIntegrationTestBase(tf.test.TestCase):
         super(_CloudTunerIntegrationTestBase, self).tearDown()
         tf.keras.backend.clear_session()
 
+    @classmethod
+    def tearDownClass(cls):
+        super(_CloudTunerIntegrationTestBase, cls).tearDownClass()
+
+        # Delete all studies
+        for study_id in cls._study_ids:
+            service = optimizer_client.create_or_load_study(
+                _PROJECT_ID, _REGION, study_id, None)
+#             studies = service.list_studies()
+#             tf.get_logger().info("study: {}", study_id)
+#             for study in studies:
+#                 tf.get_logger().info("study_id: {}", study)
+#                 service.delete_study(study["name"])
+
+            service.delete_study()
+
 
 class CloudTunerIntegrationTest(_CloudTunerIntegrationTestBase):
 
@@ -149,6 +171,7 @@ class CloudTunerIntegrationTest(_CloudTunerIntegrationTestBase):
     def testCloudTunerHyperparameters(self):
         """Test case to configure Tuner with HyperParameters object."""
         study_id = "{}_hyperparameters".format(_STUDY_ID_BASE)
+        self._study_ids.append(study_id)
         tuner = CloudTuner(
             _build_model,
             project_id=_PROJECT_ID,
@@ -196,6 +219,7 @@ class CloudTunerIntegrationTest(_CloudTunerIntegrationTestBase):
         )
 
         study_id = "{}_dataset".format(_STUDY_ID_BASE)
+        self._study_ids.append(study_id)
         tuner = CloudTuner(
             _build_model,
             project_id=_PROJECT_ID,
@@ -253,6 +277,7 @@ class CloudTunerIntegrationTest(_CloudTunerIntegrationTestBase):
         }
 
         study_id = "{}_study_config".format(_STUDY_ID_BASE)
+        self._study_ids.append(study_id)
         tuner = CloudTuner(
             _build_model,
             project_id=_PROJECT_ID,
@@ -286,6 +311,7 @@ class CloudTunerInDistributedIntegrationTest(_CloudTunerIntegrationTestBase):
     def testCloudTunerInProcessDistributedTuning(self):
         """Test case to simulate multiple parallel tuning workers."""
         study_id = "{}_dist".format(_STUDY_ID_BASE)
+        self._study_ids.append(study_id)
 
         with multiprocessing.Pool(processes=_NUM_PARALLEL_TRIALS) as pool:
             results = pool.map(
